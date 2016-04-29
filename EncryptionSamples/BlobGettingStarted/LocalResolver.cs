@@ -14,7 +14,7 @@
 // </copyright>
 // -----------------------------------------------------------------------------------------
 
-namespace BlobGettingStarted
+namespace AzureEncryptedDublin
 {
     using Microsoft.Azure.KeyVault.Core;
     using System;

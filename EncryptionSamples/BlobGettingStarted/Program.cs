@@ -16,6 +16,8 @@
         const string DemoContainer = "dublin";
         static IKey DemoKey;
 
+        const string DemoMessage = "Brace yourselves.  Winter is coming.";
+
         static void Main(string[] args)
         {
             Console.WriteLine("Blob encryption sample");
@@ -24,54 +26,71 @@
             string storageConnectionString = CloudConfigurationManager.GetSetting("StorageConnectionString");
             CloudStorageAccount storageAccount = CloudStorageAccount.Parse(storageConnectionString);
             CloudBlobClient client = storageAccount.CreateCloudBlobClient();
-            CloudBlobContainer container = client.GetContainerReference(DemoContainer + Guid.NewGuid().ToString("N"));                            
+            CloudBlobContainer container = client.GetContainerReference(DemoContainer + Guid.NewGuid().ToString("N"));
             container.Create();
 
             // Upload and download
-            Upload(container);
-            Download(container);
+            UploadEncrypted(container);
+            DownloadEncrypted(container);
 
             // Cleanup and wait
-            Cleanup(container);             
+            Cleanup(container);
             Console.WriteLine("Press enter key to exit");
             Console.ReadLine();
         }
 
+        #region clear
+
         static void Upload(CloudBlobContainer container)
-        { 
-            // Make some fake data
-            int size = 1 * 1024 * 1024;
-            byte[] buffer = new byte[size];
+        {
+            // Reference a new blob
+            CloudBlockBlob blob = container.GetBlockBlobReference("blockblob");
+            
+            Console.WriteLine("Uploading the blob.");
 
-            Random rand = new Random();
-            rand.NextBytes(buffer);
+            // Upload the contents to the blob.
+            blob.UploadText(DemoMessage);
+        }
 
+        static void Download(CloudBlobContainer container)
+        {
+            CloudBlockBlob blob = container.GetBlockBlobReference("blockblob");
+           
+            Console.WriteLine("Downloading the blob.");
+
+            // Download and decrypt the encrypted contents from the blob.
+            var result = blob.DownloadText();
+
+            Console.WriteLine(result);
+        }
+
+        #endregion
+
+        #region encrypted
+
+        static void UploadEncrypted(CloudBlobContainer container)
+        {
             // Reference a new blob
             CloudBlockBlob blob = container.GetBlockBlobReference("blockblob");
 
-            #region Encryption
-
+            #region Encryption        
             // Create the IKey used for encryption.  IKey is an interface for keys provided in the KeyVault namespace.
-            DemoKey = new RsaKey("private:key1");                
+            DemoKey = new RsaKey("private:key1");
 
             // Create the encryption policy to be used for upload.
             BlobEncryptionPolicy uploadPolicy = new BlobEncryptionPolicy(DemoKey, null);
 
             // Set the encryption policy on the request options.
             BlobRequestOptions uploadOptions = new BlobRequestOptions() { EncryptionPolicy = uploadPolicy };
-
             #endregion
 
             Console.WriteLine("Uploading the blob.");
 
             // Upload the contents to the blob.
-            using (MemoryStream stream = new MemoryStream(buffer))
-            {
-                blob.UploadFromStream(stream, size, null, uploadOptions, null);
-            }             
+            blob.UploadText(DemoMessage, null, null, uploadOptions, null);
         }
 
-        static void Download(CloudBlobContainer container)
+        static void DownloadEncrypted(CloudBlobContainer container)
         {
             CloudBlockBlob blob = container.GetBlockBlobReference("blockblob");
 
@@ -87,15 +106,19 @@
 
             Console.WriteLine("Downloading the encrypted blob.");
 
-            // Download and decrypt the encrypted contents from the blob.
-            using (MemoryStream outputStream = new MemoryStream())
-            {
-                blob.DownloadToStream(outputStream, null, downloadOptions, null);
-            }
+            var result = blob.DownloadText(null, null, downloadOptions, null);
 
+            Console.WriteLine(result);
         }
 
+        #endregion
+
+        #region miscellaneous
         static void Cleanup(CloudBlobContainer container)
         {
             container.DeleteIfExists();
         }
+        #endregion
+
+    }
+}
